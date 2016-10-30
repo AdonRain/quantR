@@ -1,4 +1,4 @@
-# source('ttm.R', encoding='utf-8')
+# source('PE.R', encoding='utf-8')
 
 if(!exists('getURL')){
   library('RCurl');
@@ -6,16 +6,15 @@ if(!exists('getURL')){
 
 load('.RData');
 
-if(exists('date.end')){
-  date.start <<- date.end + 1;
-}else{
+if(!exists('date.end')){
   date.start <<- as.Date('2011-05-03');
+}else if(date.end < Sys.Date()){
+  date.start <<- date.end + 1;
+  date.end <<- Sys.Date();
 }
 
-date.end <- Sys.Date();
-
-if(date.start < date.end){
-  pel <- lapply(getURL(lapply(seq(date.start, date.end, 'day'), function(day) {
+if(date.start <= date.end){
+  ttm.list <- lapply(getURL(lapply(seq(date.start, date.end, 'day'), function(day) {
     return(paste('http://www.csindex.com.cn/sseportal/csiportal/syl/hytype.do?code=3&zb_flg=2&db_type=0',
       paste('date', day, sep = '='),
       sep = '&'));
@@ -40,20 +39,52 @@ if(date.start < date.end){
     }
   });
 
-  if(exists('pev')){
-    pev <<- c(pev, as.vector(unlist(pel)))
+  if(exists('ttm.vector')){
+    ttm.vector <<- c(ttm.vector, as.numeric(as.vector(unlist(ttm.list))));
   }else{
-    pev <<- as.vector(unlist(pel));
+    ttm.vector <<- as.numeric(as.vector(unlist(ttm.list)));
   }
 }
 
-npev <- as.numeric(pev);
+utils.mean <- function (mid){
+  return(mean(as.vector(unlist(lapply(ttm.vector, function (pe){
+    if(mid > 0){
+      if(pe > mid){
+        return(pe);
+      }else{
+        return(NULL);
+      }
+    }else{
+      if(pe < -mid){
+        return(pe);
+      }else{
+        return(NULL);
+      }
+    }
+  })))));
+}
 
-plot(npev, type='l');
-abline(h=max(npev), col='red');
-abline(h=min(npev), col='blue');
-abline(h=mean(npev), col='green');
-abline(h=median(npev), col='gold');
-abline(h=0.5*(max(npev)+min(npev)), col='violet');
+price.high <- max(ttm.vector);
+price.low <- min(ttm.vector);
+price.mid <- 0.5 * (price.high + price.low);
+price.long <- utils.mean(-price.mid);
+price.short <- utils.mean(price.mid);
+
+plot(ttm.vector, type='l');
+
+abline(h=price.high, col='red');
+abline(h=price.low, col='blue');
+abline(h=price.mid, col='green');
+abline(h=price.long, col='gold');
+abline(h=price.short, col='violet');
+
+legend(
+  'topleft',
+  as.character(round(c(price.high, price.short, price.mid, price.long, price.low), 1)),
+  inset = .05,
+  title = 'pe',
+  lty = rep(1, 5),
+  col = c('red', 'violet', 'green', 'gold', 'blue')
+);
 
 print(paste('最新日期', date.end, sep='：'));
