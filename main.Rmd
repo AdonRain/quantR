@@ -1,0 +1,83 @@
+---
+title: "Play with data"
+author: "AdonRain"
+date: "2017年4月4日"
+---
+
+<!-- knit('../main.Rmd', 'main.md') -->
+
+```{r echo=F}
+setwd('D:/weiyun/samma-ajiva/quantR/')
+
+util <- import::from('./utils/base.R', 'import', .into='util')
+func <- import::from('./utils/func.R', 'stock', .into='func')
+conf <- import::from('./config.R', 'stock', 'code', .into='conf')
+
+pkgs <- util$import(c('lubridate', 'ggplot2', 'TTR', 'Cairo'))
+
+stk <- conf$stock[[code]]
+
+train <- func$stock(stk$symbol)
+```
+
+## 原始数据概览
+
+```{r echo=F}
+summary(train)
+```
+
+## 给数据扩展新的字段
+
+```{r}
+train$weekday <- wday(train$date) - 1
+train$month <- month(train$date)
+train$rose <- round(train$close / train$open - 1, 4)
+train$turn_vol <- round(train$turnover / train$volume, 4)
+train$mean_hl <- round(0.5 * (train$high + train$low), 4)
+train$mean_co <- round(0.5 * (train$close + train$open), 4)
+train$mean_ochl <- round(0.5 * (train$mean_hl + train$mean_co), 4)
+train$range <- train$high-train$low;
+train$body <- abs(train$close-train$open);
+train$vibrate <- round(train$range / train$open, 4)
+train$body_range <- round(train$body / train$range, 4)
+train$up_shadow <- round((train$high - ifelse(train$rose > 0, train$close, train$open)) / train$range, 4)
+train$down_shadow <- round((ifelse(train$rose > 0, train$open, train$close) - train$low) / train$range, 4)
+train$shadow_diff <- train$up_shadow - train$down_shadow
+```
+
+## 添加时间序列相关字段
+
+```{r}
+train$sma <- SMA(train$close, n=stk$period)
+train$offset <- round(train$close / train$sma - 1, 4)
+```
+
+## 扩展后的数据概览
+
+```{r}
+summary(train)
+```
+
+## 设置ggplot2主题
+
+```{r}
+theme_set(theme_minimal())
+```
+
+## 绘制收盘价曲线
+
+```{r warning=F}
+ggplot(train, aes(x = date)) +
+  geom_line(aes(y = close), color='green') +
+  geom_line(aes(y = sma), color='red') +
+  scale_y_continuous("Price") +
+  ggtitle(paste(code, '\n'))
+```
+
+## 绘制价格偏离移动平均值的分布曲线
+
+```{r warning=F}
+ggplot(train, aes(x = offset)) +
+  geom_density(alpha = 0.3, fill = 'green') +
+  ggtitle(paste(code, '\n'))
+```
